@@ -1,0 +1,51 @@
+# Bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+venv/
+.env/
+.envrc
+
+# Python environment files
+pip-log.txt
+*.egg
+*.egg-info/
+
+# Docker
+*.tar
+*.bak
+docker-compose.override.yml
+
+# Logs
+*.log
+*.log.*
+
+# VSCode / IDE files
+.vscode/
+.idea/
+*.swp
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# pytest / test cache
+.cache/
+.pytest_cache/
+
+# Jupyter Notebook checkpoints (if used)
+.ipynb_checkpoints/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# AWS CLI credentials (avoid accidental commits)
+.aws/
