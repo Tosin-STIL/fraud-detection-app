@@ -1,0 +1,93 @@
+name: Deploy to ECS (Reusable for All Services)
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Name of the service to deploy (e.g., ingestion_service)'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID || '590183956481' }}
+      CLUSTER_NAME: fraud-detection-dev-ecs-cluster
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set variables
+        id: vars
+        run: |
+          SERVICE_NAME=${{ github.event.inputs.service }}
+          ECR_REPO=${SERVICE_NAME//_/-}  # replaces _ with -
+          IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/fraud-detection-dev-$ECR_REPO"
+
+          echo "SERVICE_NAME=$SERVICE_NAME" >> $GITHUB_ENV
+          echo "ECR_REPO=$ECR_REPO" >> $GITHUB_ENV
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push Docker image
+        run: |
+          docker build -t $IMAGE_URI:latest ./${{ env.SERVICE_NAME }}
+          docker push $IMAGE_URI:latest
+
+      - name: Register new task definition
+        id: task-def
+        run: |
+          TASK_DEF=$(cat <<EOF
+          {
+            "family": "$ECR_REPO-task-def",
+            "networkMode": "awsvpc",
+            "requiresCompatibilities": ["FARGATE"],
+            "cpu": "256",
+            "memory": "512",
+            "executionRoleArn": "arn:aws:iam::$AWS_ACCOUNT_ID:role/ecsTaskExecutionRole",
+            "containerDefinitions": [
+              {
+                "name": "$ECR_REPO",
+                "image": "$IMAGE_URI:latest",
+                "portMappings": [
+                  {
+                    "containerPort": 80,
+                    "protocol": "tcp"
+                  }
+                ],
+                "essential": true
+              }
+            ]
+          }
+          EOF
+          )
+
+          echo "$TASK_DEF" > task-def.json
+          aws ecs register-task-definition \
+            --cli-input-json file://task-def.json \
+            > task-def-out.json
+
+          REVISION=$(jq -r '.taskDefinition.revision' task-def-out.json)
+          echo "TASK_REVISION=$REVISION" >> $GITHUB_ENV
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service fraud-detection-dev-$ECR_REPO \
+            --task-definition $ECR_REPO-task-def:$TASK_REVISION \
+            --force-new-deployment
+
+      - name: Done ✅
+        run: echo "Deployed $SERVICE_NAME to ECS using $IMAGE_URI:latest"
