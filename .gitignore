@@ -49,3 +49,5 @@ dist/
 
 # AWS CLI credentials (avoid accidental commits)
 .aws/
+
+fraud_detection_service/model.pkl
