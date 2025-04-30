@@ -15,14 +15,16 @@ sns_client = boto3.client("sns", region_name="eu-west-1")
 
 def publish_alert(transaction_id, probability):
     message = f"🚨 Fraud detected!\nTransaction ID: {transaction_id}\nProbability: {probability}"
+    print("[SNS] Attempting to send fraud alert...")
     try:
-        sns_client.publish(
+        response = sns_client.publish(
             TopicArn=SNS_TOPIC_ARN,
             Message=message,
             Subject="Fraud Alert"
         )
+        print(f"[SNS ✅] Alert published. Message ID: {response['MessageId']}")
     except ClientError as e:
-        print(f"[⚠️ SNS Error] Failed to publish alert: {e}")
+        print(f"[⚠️ SNS ERROR] Failed to publish alert: {e}")
 
 @app.post("/action")
 async def handle_action(request: Request):
@@ -45,7 +47,7 @@ async def handle_action(request: Request):
     with open(LOG_FILE, "a") as f:
         f.write(json.dumps(log_entry) + "\n")
 
-    # Send alert if fraud detected
+    # Publish SNS alert if fraud
     if is_fraud:
         publish_alert(transaction_id, probability)
 
