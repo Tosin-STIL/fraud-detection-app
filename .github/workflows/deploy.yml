@@ -71,9 +71,9 @@ jobs:
                 "logConfiguration": {
                   "logDriver": "awslogs",
                   "options": {
-                    "awslogs-group": "/ecs/$ECR_REPO",
+                    "awslogs-group": "/ecs/fraud-detection-dev-$SERVICE_NAME",
                     "awslogs-region": "$AWS_REGION",
-                    "awslogs-stream-prefix": "$ECR_REPO"
+                    "awslogs-stream-prefix": "fraud-detection-dev-$SERVICE_NAME"
                   }
                 }
               }
